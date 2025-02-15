@@ -1,2 +1,7 @@
-# C4Rent
-Rent Operation System
+## C4Rent
+
+Daily Rent Operation
+
+#### License
+
+mit
