@@ -12,6 +12,31 @@ frappe.ui.form.on('Rent', {
         load_items(frm,frm.doc.item_group); // Load items based on the selected item group
     },
     onload: function (frm) {
+        // استخدام دالة غير متزامنة لجلب القيمة
+        frappe.db.get_single_value('Rent Settings', 'default_target_warehouse')
+            .then(defaultTargetWarehouse => {
+                if (defaultTargetWarehouse) {
+                    // التأكد من وجود المستودع قبل التعيين
+                    frappe.db.exists('Warehouse', defaultTargetWarehouse)
+                        .then(exists => {
+                            if (exists) {
+                                frm.set_value("target_warehouse", defaultTargetWarehouse);
+                            } else {
+                                frappe.msgprint({
+                                    title: __("مستودع غير موجود"),
+                                    indicator: "red",
+                                    message: __("المستودع المحدد في الإعدادات غير موجود: {0}", [defaultTargetWarehouse])
+                                });
+                            }
+                        });
+                } else {
+                    frappe.msgprint({
+                        title: __("إعدادات ناقصة"),
+                        indicator: "red",
+                        message: __("يجب تعبئة حقل 'Default Target Warehouse' في إعدادات التأجير أولاً")
+                    });
+                }
+            });
         initialize_slider(frm);
         if (frm.doc.item_group) {
             load_items(frm, frm.doc.item_group);
@@ -57,30 +82,25 @@ frappe.ui.form.on("Rent", {
                         "cost_center": frm.doc.cost_center,
                         "from_warehouse": frm.doc.target_warehouse,
                         "to_warehouse": frm.doc.source_warehouse,
-                        "selling_price_list": "Daily"
+                        "selling_price_list": "Daily",
+                        "cost_center": frm.doc.cost_center,
                     };
                     frappe.new_doc("Sales Invoice");
                 }, __("Create"));
             }
-        }
-    }
-});
-
-frappe.ui.form.on("Rent", {
-    refresh: function(frm, cdt, cdn) {
-        if (frm.doc.docstatus == 1) {
+            // Add the Payment Entry button
             frm.add_custom_button(__("Payment Entry"), function() {
-                frappe.route_options = {
-                    "payment_type": "Receive",
-                    "party_type": "Customer",
-                    "party": frm.doc.customer,
-                };
-                frappe.new_doc("Payment Entry");
-            }, __("Create"));
+                frm.events.make_payment_entry(frm)
+            }, __("Create"));            
         }
-    }
+    },
+    make_payment_entry: function(frm) {
+		frappe.model.open_mapped_doc({
+			method: "c4rent.c4rent.doctype.rent.rent.make_payment_entry",
+			frm: frm
+		});
+	},
 });
-
 frappe.ui.form.on("Rent", "validate", function() {
     for (var i = 0; i < cur_frm.doc.time_logs.length; i++) {
         cur_frm.doc.time_logs[i].uom = cur_frm.doc.rent_type;
